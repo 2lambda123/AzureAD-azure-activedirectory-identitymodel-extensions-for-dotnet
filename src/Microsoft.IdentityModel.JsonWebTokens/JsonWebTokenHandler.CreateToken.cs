@@ -19,7 +19,7 @@ using TokenLogMessages = Microsoft.IdentityModel.Tokens.LogMessages;
 namespace Microsoft.IdentityModel.JsonWebTokens
 {
     /// <summary>
-    /// A <see cref="SecurityTokenHandler"/> designed for creating and validating Json Web Tokens. 
+    /// A <see cref="SecurityTokenHandler"/> designed for creating and validating Json Web Tokens.
     /// See: https://datatracker.ietf.org/doc/html/rfc7519 and http://www.rfc-editor.org/info/rfc7515.
     /// </summary>
     /// <remarks>This partial class is focused on TokenCreation.</remarks>
@@ -487,7 +487,7 @@ namespace Microsoft.IdentityModel.JsonWebTokens
         /// <param name="payload">A string containing JSON which represents the JWT token payload.</param>
         /// <param name="signingCredentials">Defines the security key and algorithm that will be used to sign the JWT.</param>
         /// <param name="encryptingCredentials">Defines the security key and algorithm that will be used to encrypt the JWT.</param>
-        /// <param name="compressionAlgorithm">Defines the compression algorithm that will be used to compress the JWT token payload.</param>       
+        /// <param name="compressionAlgorithm">Defines the compression algorithm that will be used to compress the JWT token payload.</param>
         /// <param name="additionalHeaderClaims">Defines the dictionary containing any custom header claims that need to be added to the outer JWT token header.</param>
         /// <param name="additionalInnerHeaderClaims">Defines the dictionary containing any custom header claims that need to be added to the inner JWT token header.</param>
         /// <exception cref="ArgumentNullException">if <paramref name="payload"/> is null.</exception>
@@ -534,7 +534,7 @@ namespace Microsoft.IdentityModel.JsonWebTokens
         /// <param name="payload">A string containing JSON which represents the JWT token payload.</param>
         /// <param name="signingCredentials">Defines the security key and algorithm that will be used to sign the JWT.</param>
         /// <param name="encryptingCredentials">Defines the security key and algorithm that will be used to encrypt the JWT.</param>
-        /// <param name="compressionAlgorithm">Defines the compression algorithm that will be used to compress the JWT token payload.</param>       
+        /// <param name="compressionAlgorithm">Defines the compression algorithm that will be used to compress the JWT token payload.</param>
         /// <param name="additionalHeaderClaims">Defines the dictionary containing any custom header claims that need to be added to the outer JWT token header.</param>
         /// <exception cref="ArgumentNullException">if <paramref name="payload"/> is null.</exception>
         /// <exception cref="ArgumentNullException">if <paramref name="signingCredentials"/> is null.</exception>
@@ -1039,8 +1039,8 @@ namespace Microsoft.IdentityModel.JsonWebTokens
                     writer.WriteString(JwtHeaderUtf8Bytes.Alg, encryptingCredentials.Alg);
                     writer.WriteString(JwtHeaderUtf8Bytes.Enc, encryptingCredentials.Enc);
 
-                    if (encryptingCredentials.Key.KeyId != null)
-                        writer.WriteString(JwtHeaderUtf8Bytes.Kid, encryptingCredentials.Key.KeyId);
+                    if (encryptingCredentials.KeyExchangePublicKey.KeyId != null)
+                        writer.WriteString(JwtHeaderUtf8Bytes.Kid, encryptingCredentials.KeyExchangePublicKey.KeyId);
 
                     if (!string.IsNullOrEmpty(compressionAlgorithm))
                         writer.WriteString(JwtHeaderUtf8Bytes.Zip, compressionAlgorithm);
@@ -1066,6 +1066,9 @@ namespace Microsoft.IdentityModel.JsonWebTokens
 
                     if (!ctyWritten)
                         writer.WriteString(JwtHeaderUtf8Bytes.Cty, JwtConstants.HeaderType);
+
+                    if (SupportedAlgorithms.EcdsaWrapAlgorithms.Contains(encryptingCredentials.Alg))
+                        writer.WriteString(JwtHeaderUtf8Bytes.Epk, JsonWebKeyConverter.ConvertFromSecurityKey(encryptingCredentials.Key).RepresentAsAsymmetricPublicJwk());
 
                     writer.WriteEndObject();
                     writer.Flush();
@@ -1302,14 +1305,14 @@ namespace Microsoft.IdentityModel.JsonWebTokens
                 {
                     if (LogHelper.IsEnabled(EventLogLevel.Informational))
                         LogHelper.LogInformation(TokenLogMessages.IDX10904, key);
-                } 
+                }
                 else if (configuration != null)
                 {
                     key = ResolveTokenDecryptionKeyFromConfig(jwtToken, configuration);
                     if (key != null && LogHelper.IsEnabled(EventLogLevel.Informational))
                         LogHelper.LogInformation(TokenLogMessages.IDX10905, key);
                 }
-                    
+
                 if (key != null)
                     keys = new List<SecurityKey> { key };
             }
@@ -1345,9 +1348,12 @@ namespace Microsoft.IdentityModel.JsonWebTokens
                     if (SupportedAlgorithms.EcdsaWrapAlgorithms.Contains(jwtToken.Alg))
                     {
                         // on decryption we get the public key from the EPK value see: https://datatracker.ietf.org/doc/html/rfc7518#appendix-C
+                        jwtToken.TryGetHeaderValue(JwtHeaderParameterNames.Epk, out string epk);
+                        var ephemeralPublicKey = new ECDsaSecurityKey(new JsonWebKey(epk), false);
+
                         var ecdhKeyExchangeProvider = new EcdhKeyExchangeProvider(
                             key as ECDsaSecurityKey,
-                            validationParameters.TokenDecryptionKey as ECDsaSecurityKey,
+                            ephemeralPublicKey,
                             jwtToken.Alg,
                             jwtToken.Enc);
                         jwtToken.TryGetHeaderValue(JwtHeaderParameterNames.Apu, out string apu);
