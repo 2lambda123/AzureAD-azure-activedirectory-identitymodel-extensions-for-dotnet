@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+//using Microsoft.Extensions.Logging;
 
 namespace Microsoft.IdentityModel.Logging
 {
@@ -43,6 +44,12 @@ namespace Microsoft.IdentityModel.Logging
         /// Gets or sets a string that helps with setting breakpoints when debugging.
         /// </summary>
         public virtual string DebugId { get; set; } = string.Empty;
+
+        // TODO - figure out how to use ILogger
+        // <summary>
+        // Gets or sets the <see cref="ILogger"/> that will be used to log messages.
+        // </summary>
+        //public ILogger Logger { get; set; }
 
         /// <summary>
         /// The collection of logs associated with a request. Use <see cref="CaptureLogs"/> to control capture.

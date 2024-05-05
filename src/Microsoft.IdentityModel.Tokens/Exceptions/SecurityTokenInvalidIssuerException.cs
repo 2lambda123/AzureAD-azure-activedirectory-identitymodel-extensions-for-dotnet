@@ -2,7 +2,9 @@
 // Licensed under the MIT License.
 
 using System;
+using System.Diagnostics;
 using System.Runtime.Serialization;
+using System.Text;
 
 namespace Microsoft.IdentityModel.Tokens
 {
