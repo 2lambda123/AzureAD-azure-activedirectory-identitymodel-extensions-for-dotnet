@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Security.Claims;
+using System.Text;
 using System.Text.Json;
 using Microsoft.IdentityModel.Logging;
 using Microsoft.IdentityModel.Tokens;
@@ -24,13 +25,29 @@ namespace Microsoft.IdentityModel.JsonWebTokens
 
         internal object _claimsLock = new();
         internal readonly Dictionary<string, object> _jsonClaims;
+        internal readonly Dictionary<string, (int startIndex, int length)> _jsonClaimsUtf8;
+        internal readonly Memory<byte> _tokenAsMemory;
         private List<Claim> _claims;
 
-        internal JsonClaimSet() { _jsonClaims = new Dictionary<string, object>(); }
+        internal JsonClaimSet()
+        {
+            _jsonClaims = new();
+            _jsonClaimsUtf8 = new();
+        }
 
         internal JsonClaimSet(Dictionary<string, object> jsonClaims)
         {
             _jsonClaims = jsonClaims;
+        }
+
+        internal JsonClaimSet(
+            Dictionary<string, object> jsonClaims,
+            Dictionary<string, (int startIndex, int length)> jsonClaimsUtf8,
+            Memory<byte> tokenAsMemory)
+        {
+            _jsonClaims = jsonClaims;
+            _jsonClaimsUtf8 = jsonClaimsUtf8;
+            _tokenAsMemory = tokenAsMemory;
         }
 
         internal List<Claim> Claims(string issuer)
@@ -71,7 +88,7 @@ namespace Microsoft.IdentityModel.JsonWebTokens
             else if (value is double d)
                 claims.Add(new Claim(claimType, d.ToString(CultureInfo.InvariantCulture), ClaimValueTypes.Double, issuer, issuer));
             else if (value is DateTime dt)
-                claims.Add(new Claim(claimType, dt.ToString("o",CultureInfo.InvariantCulture), ClaimValueTypes.DateTime, issuer, issuer));
+                claims.Add(new Claim(claimType, dt.ToString("o", CultureInfo.InvariantCulture), ClaimValueTypes.DateTime, issuer, issuer));
             else if (value is float f)
                 claims.Add(new Claim(claimType, f.ToString(CultureInfo.InvariantCulture), ClaimValueTypes.Double, issuer, issuer));
             else if (value is decimal m)
@@ -159,6 +176,12 @@ namespace Microsoft.IdentityModel.JsonWebTokens
 
         internal string GetStringValue(string key)
         {
+#if NET7_0_OR_GREATER
+            if (_jsonClaimsUtf8.TryGetValue(key, out (int, int) tuple))
+            {
+                return Encoding.UTF8.GetString(_tokenAsMemory.Slice(tuple.Item1, tuple.Item2).Span);
+            }
+#else
             if (_jsonClaims.TryGetValue(key, out object obj))
             {
                 if (obj == null)
@@ -166,9 +189,23 @@ namespace Microsoft.IdentityModel.JsonWebTokens
 
                 return obj.ToString();
             }
+#endif
 
             return string.Empty;
         }
+
+#if NET7_0_OR_GREATER
+        internal ReadOnlySpan<byte> GetUtf8Bytes(string key)
+        {
+            // (int startIndex, int length) tuple
+            if (_jsonClaimsUtf8.TryGetValue(key, out (int, int) tuple))
+            {
+                return _tokenAsMemory.Slice(tuple.Item1, tuple.Item2).Span;
+            }
+
+            return new Span<byte>();
+        }
+#endif
 
         internal DateTime GetDateTime(string key)
         {
@@ -317,7 +354,7 @@ namespace Microsoft.IdentityModel.JsonWebTokens
             else if (typeof(T) == typeof(Collection<object>))
                 return (T)(object)new Collection<object> { obj };
 
-            else if(typeof(T).IsEnum)
+            else if (typeof(T).IsEnum)
             {
                 return (T)Enum.Parse(typeof(T), obj.ToString(), ignoreCase: true);
             }
@@ -339,7 +376,7 @@ namespace Microsoft.IdentityModel.JsonWebTokens
                 if (objType == typeof(long))
                     return (T)(object)new long[] { (long)obj };
 
-                if(objType == typeof(int))
+                if (objType == typeof(int))
                     return (T)(object)new long[] { (int)obj };
 
                 if (long.TryParse(obj.ToString(), out long value))
@@ -347,7 +384,7 @@ namespace Microsoft.IdentityModel.JsonWebTokens
             }
             else if (typeof(T) == typeof(double))
             {
-                if(double.TryParse(obj.ToString(), out double value))
+                if (double.TryParse(obj.ToString(), out double value))
                     return (T)(object)value;
             }
             else if (typeof(T) == typeof(uint))
@@ -422,6 +459,17 @@ namespace Microsoft.IdentityModel.JsonWebTokens
         /// <returns></returns>
         internal bool TryGetValue<T>(string key, out T value)
         {
+#if NET7_0_OR_GREATER
+            if (typeof(T) == typeof(string))
+            {
+                var span = GetUtf8Bytes(key);
+                if (!span.IsEmpty)
+                {
+                    value = (T)(object)Encoding.UTF8.GetString(span);
+                    return true;
+                }
+            }
+#endif
             value = GetValue<T>(key, false, out bool found);
             return found;
         }
