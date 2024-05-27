@@ -166,15 +166,27 @@ namespace Microsoft.IdentityModel.Protocols
                                 throw LogHelper.LogExceptionMessage(new InvalidConfigurationException(LogHelper.FormatInvariant(LogMessages.IDX20810, result.ErrorMessage)));
                         }
 
-                        _lastRefresh = DateTimeOffset.UtcNow;
+                        DateTimeOffset utcNow =
+#if SUPPORTS_TIME_PROVIDER
+                            TimeProvider?.GetUtcNow() ??
+#endif
+                            DateTimeOffset.UtcNow;
+
+                        _lastRefresh = utcNow;
                         // Add a random amount between 0 and 5% of AutomaticRefreshInterval jitter to avoid spike traffic to IdentityProvider.
-                        _syncAfter = DateTimeUtil.Add(DateTime.UtcNow, AutomaticRefreshInterval +
-                            TimeSpan.FromSeconds(new Random().Next((int)AutomaticRefreshInterval.TotalSeconds / 20)));
+                        _syncAfter = DateTimeUtil.Add(utcNow.UtcDateTime, AutomaticRefreshInterval +
+                                                              TimeSpan.FromSeconds(new Random().Next((int)AutomaticRefreshInterval.TotalSeconds / 20)));
                         _currentConfiguration = configuration;
                     }
                     catch (Exception ex)
                     {
                         _fetchMetadataFailure = ex;
+
+                        DateTime utcNow =
+#if SUPPORTS_TIME_PROVIDER
+                            TimeProvider?.GetUtcNow().UtcDateTime ??
+#endif
+                            DateTime.UtcNow;
 
                         if (_currentConfiguration == null) // Throw an exception if there's no configuration to return.
                         {
@@ -183,20 +195,20 @@ namespace Microsoft.IdentityModel.Protocols
                                 // Adopt exponential backoff for bootstrap refresh interval with a decorrelated jitter if it is not longer than the refresh interval.
                                 TimeSpan _bootstrapRefreshIntervalWithJitter = TimeSpan.FromSeconds(new Random().Next((int)_bootstrapRefreshInterval.TotalSeconds));
                                 _bootstrapRefreshInterval += _bootstrapRefreshInterval;
-                                _syncAfter = DateTimeUtil.Add(DateTime.UtcNow, _bootstrapRefreshIntervalWithJitter);
+                                _syncAfter = DateTimeUtil.Add(utcNow, _bootstrapRefreshIntervalWithJitter);
                             }
                             else
                             {
-                                _syncAfter = DateTimeUtil.Add(DateTime.UtcNow, AutomaticRefreshInterval < RefreshInterval ? AutomaticRefreshInterval : RefreshInterval);
+                                _syncAfter = DateTimeUtil.Add(utcNow, AutomaticRefreshInterval < RefreshInterval ? AutomaticRefreshInterval : RefreshInterval);
                             }
 
                             throw LogHelper.LogExceptionMessage(
                                 new InvalidOperationException(
                                     LogHelper.FormatInvariant(LogMessages.IDX20803, LogHelper.MarkAsNonPII(MetadataAddress ?? "null"), LogHelper.MarkAsNonPII(_syncAfter), LogHelper.MarkAsNonPII(ex)), ex));
-                        } 
+                        }
                         else
                         {
-                            _syncAfter = DateTimeUtil.Add(DateTime.UtcNow, AutomaticRefreshInterval < RefreshInterval ? AutomaticRefreshInterval : RefreshInterval);
+                            _syncAfter = DateTimeUtil.Add(utcNow, AutomaticRefreshInterval < RefreshInterval ? AutomaticRefreshInterval : RefreshInterval);
 
                             LogHelper.LogExceptionMessage(
                                 new InvalidOperationException(

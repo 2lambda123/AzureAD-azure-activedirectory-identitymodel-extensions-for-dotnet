@@ -15,7 +15,7 @@ using Microsoft.IdentityModel.Tokens;
 namespace Microsoft.IdentityModel.Protocols.OpenIdConnect
 {
     /// <summary>
-    /// Delegate for validating additional claims in 'id_token' 
+    /// Delegate for validating additional claims in 'id_token'
     /// </summary>
     /// <param name="idToken"><see cref="JwtSecurityToken"/> to validate</param>
     /// <param name="context"><see cref="OpenIdConnectProtocolValidationContext"/> used for validation</param>
@@ -88,11 +88,29 @@ namespace Microsoft.IdentityModel.Protocols.OpenIdConnect
             string nonce = Convert.ToBase64String(Encoding.UTF8.GetBytes(Guid.NewGuid().ToString() + Guid.NewGuid().ToString()));
             if (RequireTimeStampInNonce)
             {
-                return DateTime.UtcNow.Ticks.ToString(CultureInfo.InvariantCulture) + "." + nonce;
+                DateTime utcNow =
+#if SUPPORTS_TIME_PROVIDER
+                    TimeProvider?.GetUtcNow().UtcDateTime ??
+#endif
+                    DateTime.UtcNow;
+
+                return utcNow.Ticks.ToString(CultureInfo.InvariantCulture) + "." + nonce;
             }
 
             return nonce;
         }
+
+#if SUPPORTS_TIME_PROVIDER
+#nullable enable
+        /// <summary>
+        /// Gets or sets the time provider.
+        /// </summary>
+        /// <remarks>
+        /// If not set, fall back to using the <see cref="DateTime"/> class to obtain the current time.
+        /// </remarks>
+        public TimeProvider? TimeProvider { get; set; }
+#nullable restore
+#endif
 
         /// <summary>
         /// Gets the algorithm mapping between OpenIdConnect and .Net for Hash algorithms.
@@ -210,7 +228,7 @@ namespace Microsoft.IdentityModel.Protocols.OpenIdConnect
             if (validationContext == null)
                 throw LogHelper.LogArgumentNullException("validationContext");
 
-            // no 'response' is received or 'id_token' in the response is null 
+            // no 'response' is received or 'id_token' in the response is null
             if (validationContext.ProtocolMessage == null)
                 throw LogHelper.LogExceptionMessage(new OpenIdConnectProtocolException(LogMessages.IDX21333));
 
@@ -254,7 +272,7 @@ namespace Microsoft.IdentityModel.Protocols.OpenIdConnect
             if (validationContext == null)
                 throw LogHelper.LogArgumentNullException(nameof(validationContext));
 
-            // no 'response' is recieved 
+            // no 'response' is recieved
             if (validationContext.ProtocolMessage == null)
                 throw LogHelper.LogExceptionMessage(new OpenIdConnectProtocolException(LogMessages.IDX21333));
 
@@ -490,8 +508,8 @@ namespace Microsoft.IdentityModel.Protocols.OpenIdConnect
         /// <exception cref="ArgumentNullException">If 'validationContext' is null.</exception>
         /// <exception cref="ArgumentNullException">If 'validationContext.ValidatedIdToken' is null.</exception>
         /// <exception cref="OpenIdConnectProtocolInvalidCHashException">If the validationContext contains a 'code' and there is no 'c_hash' claim in the 'id_token'.</exception>
-        /// <exception cref="OpenIdConnectProtocolInvalidCHashException">If the validationContext contains a 'code' and the 'c_hash' claim is not a string in the 'id_token'.</exception> 
-        /// <exception cref="OpenIdConnectProtocolInvalidCHashException">If the 'c_hash' claim in the 'id_token' does not correspond to the 'code' in the <see cref="OpenIdConnectMessage"/> response.</exception> 
+        /// <exception cref="OpenIdConnectProtocolInvalidCHashException">If the validationContext contains a 'code' and the 'c_hash' claim is not a string in the 'id_token'.</exception>
+        /// <exception cref="OpenIdConnectProtocolInvalidCHashException">If the 'c_hash' claim in the 'id_token' does not correspond to the 'code' in the <see cref="OpenIdConnectMessage"/> response.</exception>
         protected virtual void ValidateCHash(OpenIdConnectProtocolValidationContext validationContext)
         {
             LogHelper.LogVerbose(LogMessages.IDX21304);
@@ -544,8 +562,8 @@ namespace Microsoft.IdentityModel.Protocols.OpenIdConnect
         /// <exception cref="ArgumentNullException">If 'validationContext' is null.</exception>
         /// <exception cref="ArgumentNullException">If 'validationContext.ValidatedIdToken' is null.</exception>
         /// <exception cref="OpenIdConnectProtocolInvalidAtHashException">If the validationContext contains a 'token' and there is no 'at_hash' claim in the id_token.</exception>
-        /// <exception cref="OpenIdConnectProtocolInvalidAtHashException">If the validationContext contains a 'token' and the 'at_hash' claim is not a string in the 'id_token'.</exception> 
-        /// <exception cref="OpenIdConnectProtocolInvalidAtHashException">If the 'at_hash' claim in the 'id_token' does not correspond to the 'access_token' in the <see cref="OpenIdConnectMessage"/> response.</exception> 
+        /// <exception cref="OpenIdConnectProtocolInvalidAtHashException">If the validationContext contains a 'token' and the 'at_hash' claim is not a string in the 'id_token'.</exception>
+        /// <exception cref="OpenIdConnectProtocolInvalidAtHashException">If the 'at_hash' claim in the 'id_token' does not correspond to the 'access_token' in the <see cref="OpenIdConnectMessage"/> response.</exception>
         protected virtual void ValidateAtHash(OpenIdConnectProtocolValidationContext validationContext)
         {
             LogHelper.LogVerbose(LogMessages.IDX21309);
@@ -658,7 +676,12 @@ namespace Microsoft.IdentityModel.Protocols.OpenIdConnect
                     throw LogHelper.LogExceptionMessage(new OpenIdConnectProtocolInvalidNonceException(LogHelper.FormatInvariant(LogMessages.IDX21327, LogHelper.MarkAsNonPII(timestamp), LogHelper.MarkAsNonPII(DateTime.MinValue.Ticks.ToString(CultureInfo.InvariantCulture)), LogHelper.MarkAsNonPII(DateTime.MaxValue.Ticks.ToString(CultureInfo.InvariantCulture))), ex));
                 }
 
-                DateTime utcNow = DateTime.UtcNow;
+                DateTime utcNow =
+#if SUPPORTS_TIME_PROVIDER
+                    TimeProvider?.GetUtcNow().UtcDateTime ??
+#endif
+                    DateTime.UtcNow;
+
                 if (nonceTime + NonceLifetime < utcNow)
                     throw LogHelper.LogExceptionMessage(new OpenIdConnectProtocolInvalidNonceException(LogHelper.FormatInvariant(LogMessages.IDX21324, nonceFoundInJwt, LogHelper.MarkAsNonPII(nonceTime.ToString(CultureInfo.InvariantCulture)), LogHelper.MarkAsNonPII(utcNow.ToString(CultureInfo.InvariantCulture)), LogHelper.MarkAsNonPII(NonceLifetime.ToString("c", CultureInfo.InvariantCulture)))));
             }
