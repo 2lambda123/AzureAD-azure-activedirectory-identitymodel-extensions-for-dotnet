@@ -39,6 +39,18 @@ namespace Microsoft.IdentityModel.Tokens
             }
         }
 
+#if SUPPORTS_TIME_PROVIDER
+#nullable enable
+        /// <summary>
+        /// Gets or sets the time provider.
+        /// </summary>
+        /// <remarks>
+        /// If not set, fall back to using the <see cref="DateTime"/> class to obtain the current time.
+        /// </remarks>
+        public TimeProvider? TimeProvider { get; set; }
+#nullable restore
+#endif
+
         /// <summary>
         /// 12 hours is the default time interval that afterwards will obtain new configuration.
         /// </summary>
@@ -96,7 +108,13 @@ namespace Microsoft.IdentityModel.Tokens
         /// <returns>A collection of all valid last known good configurations.</returns>
         internal BaseConfiguration[] GetValidLkgConfigurations()
         {
-            return _lastKnownGoodConfigurationCache.ToArray().Where(x => x.Value.Value > DateTime.UtcNow).Select(x => x.Key).ToArray();
+            DateTime utcNow =
+#if SUPPORTS_TIME_PROVIDER
+                TimeProvider?.GetUtcNow().UtcDateTime ??
+#endif
+                DateTime.UtcNow;
+
+            return _lastKnownGoodConfigurationCache.ToArray().Where(x => x.Value.Value > utcNow).Select(x => x.Key).ToArray();
         }
 
         /// <summary>
@@ -111,10 +129,16 @@ namespace Microsoft.IdentityModel.Tokens
             set
             {
                 _lastKnownGoodConfiguration = value ?? throw LogHelper.LogArgumentNullException(nameof(value));
-                _lastKnownGoodConfigFirstUse = DateTime.UtcNow;
+                DateTime utcNow =
+#if SUPPORTS_TIME_PROVIDER
+                    TimeProvider?.GetUtcNow().UtcDateTime ??
+#endif
+                    DateTime.UtcNow;
+
+                _lastKnownGoodConfigFirstUse = utcNow;
 
                 // LRU cache will remove the expired configuration
-                _lastKnownGoodConfigurationCache.SetValue(_lastKnownGoodConfiguration, DateTime.UtcNow + LastKnownGoodLifetime, DateTime.UtcNow + LastKnownGoodLifetime);
+                _lastKnownGoodConfigurationCache.SetValue(_lastKnownGoodConfiguration, utcNow + LastKnownGoodLifetime, DateTime.UtcNow + LastKnownGoodLifetime);
             }
         }
 
@@ -173,7 +197,21 @@ namespace Microsoft.IdentityModel.Tokens
         /// </summary>
         // The _lastKnownGoodConfiguration private variable is accessed rather than the property (LastKnownGoodConfiguration) as we do not want this access
         // to trigger a change in _lastKnownGoodConfigFirstUse.
-        public bool IsLastKnownGoodValid => _lastKnownGoodConfiguration != null && (_lastKnownGoodConfigFirstUse == null || DateTime.UtcNow < _lastKnownGoodConfigFirstUse + LastKnownGoodLifetime);
+        public bool IsLastKnownGoodValid
+        {
+            get
+            {
+                DateTime utcNow =
+#if SUPPORTS_TIME_PROVIDER
+                    TimeProvider?.GetUtcNow().UtcDateTime ??
+#endif
+                    DateTime.UtcNow;
+
+                return _lastKnownGoodConfiguration != null && (_lastKnownGoodConfigFirstUse == null ||
+                                                               utcNow < _lastKnownGoodConfigFirstUse +
+                                                               LastKnownGoodLifetime);
+            }
+        }
 
         /// <summary>
         /// Indicate that the configuration may be stale (as indicated by failing to process incoming tokens).

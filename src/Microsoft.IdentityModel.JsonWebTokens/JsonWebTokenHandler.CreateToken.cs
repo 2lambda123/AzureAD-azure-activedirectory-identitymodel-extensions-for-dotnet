@@ -19,7 +19,7 @@ using TokenLogMessages = Microsoft.IdentityModel.Tokens.LogMessages;
 namespace Microsoft.IdentityModel.JsonWebTokens
 {
     /// <summary>
-    /// A <see cref="SecurityTokenHandler"/> designed for creating and validating Json Web Tokens. 
+    /// A <see cref="SecurityTokenHandler"/> designed for creating and validating Json Web Tokens.
     /// See: https://datatracker.ietf.org/doc/html/rfc7519 and http://www.rfc-editor.org/info/rfc7515.
     /// </summary>
     /// <remarks>This partial class is focused on TokenCreation.</remarks>
@@ -487,7 +487,7 @@ namespace Microsoft.IdentityModel.JsonWebTokens
         /// <param name="payload">A string containing JSON which represents the JWT token payload.</param>
         /// <param name="signingCredentials">Defines the security key and algorithm that will be used to sign the JWT.</param>
         /// <param name="encryptingCredentials">Defines the security key and algorithm that will be used to encrypt the JWT.</param>
-        /// <param name="compressionAlgorithm">Defines the compression algorithm that will be used to compress the JWT token payload.</param>       
+        /// <param name="compressionAlgorithm">Defines the compression algorithm that will be used to compress the JWT token payload.</param>
         /// <param name="additionalHeaderClaims">Defines the dictionary containing any custom header claims that need to be added to the outer JWT token header.</param>
         /// <param name="additionalInnerHeaderClaims">Defines the dictionary containing any custom header claims that need to be added to the inner JWT token header.</param>
         /// <exception cref="ArgumentNullException">if <paramref name="payload"/> is null.</exception>
@@ -534,7 +534,7 @@ namespace Microsoft.IdentityModel.JsonWebTokens
         /// <param name="payload">A string containing JSON which represents the JWT token payload.</param>
         /// <param name="signingCredentials">Defines the security key and algorithm that will be used to sign the JWT.</param>
         /// <param name="encryptingCredentials">Defines the security key and algorithm that will be used to encrypt the JWT.</param>
-        /// <param name="compressionAlgorithm">Defines the compression algorithm that will be used to compress the JWT token payload.</param>       
+        /// <param name="compressionAlgorithm">Defines the compression algorithm that will be used to compress the JWT token payload.</param>
         /// <param name="additionalHeaderClaims">Defines the dictionary containing any custom header claims that need to be added to the outer JWT token header.</param>
         /// <exception cref="ArgumentNullException">if <paramref name="payload"/> is null.</exception>
         /// <exception cref="ArgumentNullException">if <paramref name="signingCredentials"/> is null.</exception>
@@ -828,7 +828,11 @@ namespace Microsoft.IdentityModel.JsonWebTokens
             // By default we set these three properties only if they haven't been detected before.
             if (setDefaultTimesOnTokenCreation && !(expSet && iatSet && nbfSet))
             {
-                DateTime now = DateTime.UtcNow;
+                DateTime now =
+#if SUPPORTS_TIME_PROVIDER
+                    tokenDescriptor.TimeProvider?.GetUtcNow().UtcDateTime ??
+#endif
+                    DateTime.UtcNow;
 
                 if (!expSet)
                 {
@@ -1302,14 +1306,14 @@ namespace Microsoft.IdentityModel.JsonWebTokens
                 {
                     if (LogHelper.IsEnabled(EventLogLevel.Informational))
                         LogHelper.LogInformation(TokenLogMessages.IDX10904, key);
-                } 
+                }
                 else if (configuration != null)
                 {
                     key = ResolveTokenDecryptionKeyFromConfig(jwtToken, configuration);
                     if (key != null && LogHelper.IsEnabled(EventLogLevel.Informational))
                         LogHelper.LogInformation(TokenLogMessages.IDX10905, key);
                 }
-                    
+
                 if (key != null)
                     keys = [key];
             }
