@@ -14,6 +14,9 @@ namespace Microsoft.IdentityModel.Benchmarks
     {
         private JsonWebTokenHandler _jsonWebTokenHandler;
         private SecurityTokenDescriptor _tokenDescriptor;
+        private SecurityTokenDescriptor _tokenDescriptorMultipleAudiencesMemberAndClaims;
+        private SecurityTokenDescriptor _tokenDescriptorMultipleAudiencesMemberOnly;
+        private SecurityTokenDescriptor _tokenDescriptorSingleAudienceUsingAudiencesMember;
 
         [GlobalSetup]
         public void Setup()
@@ -23,11 +26,47 @@ namespace Microsoft.IdentityModel.Benchmarks
             _tokenDescriptor = new SecurityTokenDescriptor
             {
                 Claims = BenchmarkUtils.Claims,
-                SigningCredentials = BenchmarkUtils.SigningCredentialsRsaSha256,
+                SigningCredentials = BenchmarkUtils.SigningCredentialsRsaSha256
             };
+
+            _tokenDescriptorSingleAudienceUsingAudiencesMember = new SecurityTokenDescriptor
+            {
+                Claims = BenchmarkUtils.ClaimsNoAudience,
+                SigningCredentials = BenchmarkUtils.SigningCredentialsRsaSha256
+            };
+
+            _tokenDescriptorMultipleAudiencesMemberOnly = new SecurityTokenDescriptor
+            {
+                Claims = BenchmarkUtils.ClaimsNoAudience,
+                SigningCredentials = BenchmarkUtils.SigningCredentialsRsaSha256
+            };
+
+            _tokenDescriptorMultipleAudiencesMemberAndClaims = new SecurityTokenDescriptor
+            {
+                Claims = BenchmarkUtils.ClaimsMultipleAudiences,
+                SigningCredentials = BenchmarkUtils.SigningCredentialsRsaSha256
+            };
+
+            _tokenDescriptorSingleAudienceUsingAudiencesMember.Audiences.Add(BenchmarkUtils.Audience);
+            _tokenDescriptorMultipleAudiencesMemberOnly.AddAudiences(BenchmarkUtils.Audiences);
+            _tokenDescriptorMultipleAudiencesMemberAndClaims.AddAudiences(BenchmarkUtils.Audiences);
         }
 
         [Benchmark]
         public string JsonWebTokenHandler_CreateToken() => _jsonWebTokenHandler.CreateToken(_tokenDescriptor);
+
+        [Benchmark]
+        public string JsonWebTokenHandler_CreateToken_SingleAudienceUsingAudiencesMemberOnly() =>
+            _jsonWebTokenHandler.CreateToken(_tokenDescriptorSingleAudienceUsingAudiencesMember);
+
+        [Benchmark]
+        public string JsonWebTokenHandler_CreateToken_MultipleAudiencesMemberOnly() =>
+            _jsonWebTokenHandler.CreateToken(_tokenDescriptorMultipleAudiencesMemberOnly);
+
+        [Benchmark]
+        public string JsonWebTokenHandler_CreateToken_MultipleAudiencesMemberAndClaims() =>
+            _jsonWebTokenHandler.CreateToken(_tokenDescriptorMultipleAudiencesMemberAndClaims);
+
+
     }
 }

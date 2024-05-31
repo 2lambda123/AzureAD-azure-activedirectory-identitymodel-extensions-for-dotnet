@@ -706,13 +706,21 @@ namespace Microsoft.IdentityModel.JsonWebTokens
 
             writer.WriteStartObject();
 
-            if (!string.IsNullOrEmpty(tokenDescriptor.Audience))
+            if (!tokenDescriptor.Audiences.IsNullOrEmpty())
             {
+                if (!tokenDescriptor.Audience.IsNullOrEmpty() && !tokenDescriptor.Audiences.Contains(tokenDescriptor.Audience))
+                    JsonPrimitives.WriteStrings(ref writer, JwtPayloadUtf8Bytes.Aud, tokenDescriptor.Audiences, tokenDescriptor.Audience);
+                else
+                    JsonPrimitives.WriteStrings(ref writer, JwtPayloadUtf8Bytes.Aud, tokenDescriptor.Audiences);
+
                 audienceSet = true;
+            }
+            else if (!tokenDescriptor.Audience.IsNullOrEmpty())
+            {
                 writer.WritePropertyName(JwtPayloadUtf8Bytes.Aud);
                 writer.WriteStringValue(tokenDescriptor.Audience);
+                audienceSet = true;
             }
-
             if (!string.IsNullOrEmpty(tokenDescriptor.Issuer))
             {
                 issuerSet = true;
@@ -754,8 +762,13 @@ namespace Microsoft.IdentityModel.JsonWebTokens
                         audienceChecked = true;
                         if (audienceSet)
                         {
+                            string descriptorMemberName = null;
+                            if (!tokenDescriptor.Audiences.IsNullOrEmpty())
+                                descriptorMemberName = nameof(tokenDescriptor.Audiences);
+                            else if (!string.IsNullOrEmpty(tokenDescriptor.Audience))
+                                descriptorMemberName = nameof(tokenDescriptor.Audience);
                             if (LogHelper.IsEnabled(EventLogLevel.Informational))
-                                LogHelper.LogInformation(LogHelper.FormatInvariant(LogMessages.IDX14113, LogHelper.MarkAsNonPII(nameof(tokenDescriptor.Audience))));
+                                LogHelper.LogInformation(LogHelper.FormatInvariant(LogMessages.IDX14113, LogHelper.MarkAsNonPII(descriptorMemberName)));
 
                             continue;
                         }
